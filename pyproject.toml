@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "wikigraph"
+version = "0.1.0"
+description = "Extract and store graph data from Wikipedia articles in a Neo4j database."
+authors = ["Your Name <you@example.com>"]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+SPARQLWrapper = "^1.8.5"
+neo4j = "^4.3.1"
+apache-airflow = "^2.2.3"
+
+[tool.poetry.dev-dependencies]
+pytest = "^6.2.5"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
