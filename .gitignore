@@ -132,3 +132,7 @@ dmypy.json
 # neo4j
 neo4j-data/
 neo4j-logs/
+
+# airflow
+airflow-webserver.pid
+airflow-webserver.pid*
