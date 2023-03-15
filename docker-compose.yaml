@@ -1,5 +1,9 @@
 version: '3.8'
 
+networks:
+  postgres_network:
+    driver: bridge
+
 x-app-common: &app-common
   build:
     context: .
@@ -7,17 +11,29 @@ x-app-common: &app-common
   volumes:
     - .:/app
     - /app/.venv
+    - ./dags:/app/dags  # Mount the dags directory
+    - ./logs:/app/logs  # Mount the logs directory
   environment:
     - PYTHONUNBUFFERED=1
     - NEO4J_URI=bolt://neo4j:7687
     - NEO4J_USER=neo4j
     - NEO4J_PASSWORD=testpassword
+    - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
+    - AIRFLOW__CELERY__BROKER_URL=redis://redis:6379/0
+    - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+    - AIRFLOW__CORE__LOAD_EXAMPLES=False
+    - AIRFLOW__CORE__FERNET_KEY=${FERNET_KEY}
   depends_on:
-      - neo4j
+    - neo4j
+    - redis
+    - postgres
+  networks:
+    - postgres_network
+
 
 services:
   neo4j:
-    image: neo4j:4.4.0
+    image: neo4j:latest
     environment:
       NEO4J_AUTH: neo4j/testpassword
     ports:
@@ -26,12 +42,46 @@ services:
     volumes:
       - ./neo4j-data:/data
       - ./neo4j-logs:/logs
+    networks:
+      - postgres_network
 
-  app:
+  # test:
+  #   <<: *app-common
+  #   command: poetry run pytest tests/
+
+  scheduler:
+    <<: *app-common
+    networks:
+      - postgres_network
+    command: airflow scheduler
+
+  webserver:
+    <<: *app-common
+    ports: 
+      - "8080:8080"
+    command: airflow webserver --port 8080
+
+  worker:
+    <<: *app-common
+    command: airflow celery worker
+
+  postgres:
+    image: postgres:latest
+    environment:
+      - POSTGRES_USER=airflow
+      - POSTGRES_PASSWORD=airflow
+      - POSTGRES_DB=airflow
+    networks:
+      - postgres_network
+
+  redis:
+    image: redis:latest
+    networks:
+      - postgres_network
+
+
+  flower:
     <<: *app-common
     ports:
-      - "8080:8080"
-
-  test:
-    <<: *app-common
-    command: poetry run pytest tests/
+      - "5555:5555"
+    command: airflow celery flower

@@ -1,5 +1,6 @@
-import time
+import json
 import sys
+import time
 from SPARQLWrapper import SPARQLWrapper, JSON
 
 wikidata_endpoint = "https://query.wikidata.org/sparql"
@@ -103,10 +104,26 @@ def fetch_data(num_batches=1, discard_no_relationships=True):
 
 
 if __name__ == "__main__":
-    members, relationships=fetch_data(num_batches=3, discard_no_relationships=True)
+    members_discard, relationships_discard = fetch_data(num_batches=3, discard_no_relationships=True)
+    print(f"{len(members_discard)} MEMBERS (discard)")
+    print(members_discard)
+    print(f"{len(relationships_discard)} RELATIONSHIPS (discard):")
+    print(relationships_discard)
+
+    members, relationships = fetch_data(num_batches=3, discard_no_relationships=False)
     print(f"{len(members)} MEMBERS")
     print(members)
     print(f"{len(relationships)} RELATIONSHIPS:")
-    print(relationships[:5])
+    print(relationships)
+    
+    with open("./test_members_discard.json", "w") as fp:
+        fp.write(json.dumps(members_discard))
+    with open("./test_relationships_discard.json", "w") as fp:
+        fp.write(json.dumps(relationships_discard))
+
+    with open("./test_members.json", "w") as fp:
+        fp.write(json.dumps(members))
+    with open("./test_relationships.json", "w") as fp:
+        fp.write(json.dumps(relationships))
     # Process and store the relationships data as required
 
