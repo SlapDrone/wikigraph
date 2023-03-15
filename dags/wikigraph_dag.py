@@ -25,7 +25,8 @@ dag = DAG(
 
 def fetch_and_process_data(**kwargs):
     data = fetch_data()
-    processed_data = process_data(data)
+    members, relationships = data
+    processed_data = process_data(members, relationships)
     kwargs["ti"].xcom_push(key="processed_data", value=processed_data)
 
 def store_data_in_neo4j(**kwargs):

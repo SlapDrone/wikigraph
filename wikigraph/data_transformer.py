@@ -1,16 +1,18 @@
 from typing import List, Dict
 from wikigraph.sparql import fetch_data
 
-def process_data(data: List[Dict]) -> Dict[str, Dict]:
+
+def process_data(members: List[str], relationships: List[Dict]) -> Dict[str, Dict]:
     graph = {}
 
-    for entry in data:
+    # Initialize all members in the graph with an empty list of relations
+    for member in members:
+        graph[member] = {"relations": []}
+
+    # Add relationships to the corresponding members in the graph
+    for entry in relationships:
         person = entry["personLabel"]["value"]
         relation = entry["relationLabel"]["value"]
-
-        if person not in graph:
-            graph[person] = {"relations": []}
-
         graph[person]["relations"].append(relation)
 
     return graph
