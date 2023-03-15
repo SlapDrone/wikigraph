@@ -10,5 +10,8 @@ done
 echo "Initializing Airflow DB..."
 airflow db init
 
+# install local package
+poetry install
+
 # Run the provided command
 exec "$@"

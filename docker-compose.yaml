@@ -10,7 +10,7 @@ x-app-common: &app-common
     dockerfile: Dockerfile
   volumes:
     - .:/app
-    - /app/.venv
+    #- ./.venv:/app/.venv
     - ./dags:/app/dags  # Mount the dags directory
     - ./logs:/app/logs  # Mount the logs directory
   environment:
@@ -73,7 +73,6 @@ services:
         --role Admin \
         --email spiderman@superhero.org
         airflow webserver --port 8080
-
 
   worker:
     <<: *app-common
