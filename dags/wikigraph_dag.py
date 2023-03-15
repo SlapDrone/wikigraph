@@ -1,9 +1,9 @@
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
-from src.sparql import fetch_data
-from src.data_transformer import process_data
-from src.neo4j_utils import create_connection, insert_data
+from wikigraph.sparql import fetch_data
+from wikigraph.data_transformer import process_data
+from wikigraph.neo4j_utils import create_connection, insert_data
 
 default_args = {
     "owner": "airflow",

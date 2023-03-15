@@ -2,7 +2,7 @@ import pytest
 import typing as ty
 import json
 from unittest.mock import MagicMock
-from src import sparql  # Import the module instead of the function
+from wikigraph import sparql  # Import the module instead of the function
 
 
 # def mock_fetch_data(

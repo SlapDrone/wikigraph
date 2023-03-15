@@ -7,12 +7,14 @@ license = "MIT"
 
 [tool.poetry.dependencies]
 python = "^3.10"
+SQLAlchemy = "*"
 SPARQLWrapper = "*"
 neo4j = "*"
-apache-airflow = "*"
+apache-airflow = {version = "*", extras = ["celery"]}
 psycopg2 = "*"
-celery = "*"
+#celery = "*"
 flower = "*"
+redis = {version = "*", extras = ["hiredis"]}
 
 [tool.poetry.dev-dependencies]
 pytest = "*"

@@ -1,5 +1,5 @@
 import pytest
-from src.data_transformer import process_data
+from wikigraph.data_transformer import process_data
 
 def test_process_data():
     sample_data = [

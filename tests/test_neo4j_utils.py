@@ -1,5 +1,5 @@
 import pytest
-from src.neo4j_utils import create_connection, get_all_people
+from wikigraph.neo4j_utils import create_connection, get_all_people
 
 @pytest.fixture
 def driver():
