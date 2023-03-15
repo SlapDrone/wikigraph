@@ -135,4 +135,4 @@ neo4j-logs/
 
 # airflow
 airflow-webserver.pid
-airflow-webserver.pid*
+airflow-worker.pid
