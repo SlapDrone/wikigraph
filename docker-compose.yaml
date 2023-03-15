@@ -61,7 +61,19 @@ services:
     <<: *app-common
     ports: 
       - "8080:8080"
-    command: airflow webserver --port 8080
+    command: 
+      - /bin/sh
+      - -c
+      - |
+        airflow users create \
+        --username admin \
+        --firstname Peter \
+        --lastname Parker \
+        --password ${AIRFLOW_SECRET_KEY} \
+        --role Admin \
+        --email spiderman@superhero.org
+        airflow webserver --port 8080
+
 
   worker:
     <<: *app-common
