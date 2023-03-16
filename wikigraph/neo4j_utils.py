@@ -12,22 +12,25 @@ def create_connection():
 
 def insert_data(driver: Driver, data: Dict[str, Dict]):
     with driver.session() as session:
-        for person, info in data.items():
-            session.write_transaction(create_person, person)
+        for uri, info in data.items():
+            print("*" * 50)
+            print(uri, info)
+            session.write_transaction(create_person, uri, info["personLabel"])
 
             for relation in info["relations"]:
-                session.write_transaction(create_relation, person, relation)
+                session.write_transaction(create_relation, uri, relation)
 
-def create_person(tx, name):
-    query = "MERGE (p:Person {name: $name}) RETURN p"
-    return tx.run(query, name=name)
+def create_person(tx, uri, label):
+    query = "MERGE (p:Person {uri: $uri, name: $label}) RETURN p"
+    return tx.run(query, uri=uri, label=label)
 
-def create_relation(tx, person, relation):
+def create_relation(tx, person_uri, relation):
     query = """
-    MATCH (p:Person {name: $person})
+    MATCH (p:Person {uri: $person_uri})
     MERGE (p)-[:HAS_RELATION {type: $relation}]->(:Relation {type: $relation})
     """
-    return tx.run(query, person=person, relation=relation)
+    return tx.run(query, person_uri=person_uri, relation=relation)
+
 
 def get_all_people(driver: Driver) -> List[str]:
     with driver.session() as session:

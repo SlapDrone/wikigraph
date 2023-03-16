@@ -1,7 +1,10 @@
 import json
 import sys
 import time
+import typing as ty
+import pydantic
 from SPARQLWrapper import SPARQLWrapper, JSON
+
 
 wikidata_endpoint = "https://query.wikidata.org/sparql"
 sparql = SPARQLWrapper(wikidata_endpoint)
@@ -13,7 +16,7 @@ PREFIX wd: <http://www.wikidata.org/entity/>
 PREFIX wdt: <http://www.wikidata.org/prop/direct/>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 
-SELECT ?person
+SELECT ?person ?personLabel
 WHERE {
   ?person wdt:P31/wdt:P279* wd:Q5 .  # Instance of human or subclass of human
   ?person wdt:P102 wd:Q7320 .  # Member of: Nazi Party
@@ -24,7 +27,7 @@ LIMIT 100
 """
 
 # Query to get the family relationships of Nazi Party members
-relationships = [
+relationship_types = [
     "P40",   # Child
     "P22",   # Father
     "P25",   # Mother
@@ -55,7 +58,7 @@ WHERE {{
   ?person rdfs:label ?personLabel .
   FILTER (LANG(?personLabel) = "en").
   
-  VALUES ?relationship {{{relationships}}}  # Family relationship properties
+  VALUES ?relationship {{{relationship_types}}}  # Family relationship properties
   ?person ?relationship ?related_person . 
   ?related_person wdt:P31/wdt:P279* wd:Q5 .  # Instance of human or subclass of human
   ?related_person rdfs:label ?related_personLabel .
@@ -63,67 +66,127 @@ WHERE {{
 }}
 """
 
-def get_members():
+
+class Member(pydantic.BaseModel):
+    uri: str = pydantic.Field(alias="person")
+    label: str = pydantic.Field(alias="personLabel")
+
+
+class Relationship(pydantic.BaseModel):
+    person_uri: str = pydantic.Field(alias="person")
+    person_label: str = pydantic.Field(alias="personLabel")
+    related_person_uri: str = pydantic.Field(alias="related_person")
+    related_person_label: str = pydantic.Field(alias="related_personLabel")
+    relationship: str
+
+
+def map_to_models(
+    query_results: list[dict],
+    model: pydantic.BaseModel
+) -> list[pydantic.BaseModel]:
+    mapped_data = []
+
+    for result in query_results:
+        data = {key: value["value"] for key, value in result.items()}
+        instance = model(**data)
+        mapped_data.append(instance)
+
+    return mapped_data
+
+
+def get_members() -> list[Member]:
     sparql.setQuery(members_query)
     results = sparql.query().convert()
-    members = [result["person"]["value"] for result in results["results"]["bindings"]]
-    return members
+    bindings = results["results"]["bindings"]
+    return map_to_models(bindings, Member)
 
-def get_relationships(members, batch_size=10, relationships=relationships):
+
+def get_relationships(
+    members: list[Member],
+    relationship_types=relationship_types
+) -> list[Relationship]:
+    member_values = " ".join(f"wd:{member.uri.split('/')[-1]}" for member in members)
+    relationship_values = " ".join([f"wdt:{r}" for r in relationship_types])
+    relationships_query = relationships_query_template.format(
+        members=member_values,
+        relationship_types=relationship_values
+    )
+    sparql.setQuery(relationships_query)
+    results = sparql.query().convert()
+    bindings = results["results"]["bindings"]
+    print(bindings[:2])
+    return map_to_models(bindings, Relationship)
+
+
+def fetch_relationships_in_batches(
+    members: list[Member],
+    batch_size: int = 10,
+    relationship_types=relationship_types
+) -> list[Relationship]:
+    all_relationships = []
+
     for i in range(0, len(members), batch_size):
         batch = members[i:i + batch_size]
-        member_values = " ".join(f"wd:{member.split('/')[-1]}" for member in batch)
-        relationship_values = " ".join([f"wdt:{r}" for r in relationships])
-        relationships_query = relationships_query_template.format(members=member_values, relationships=relationship_values)
-        sparql.setQuery(relationships_query)
-        results = sparql.query().convert()
-        yield results["results"]["bindings"]
+        batch_relationships = get_relationships(batch, relationship_types)
+        all_relationships.extend(batch_relationships)
+
+    return all_relationships
 
 
-def fetch_data(num_batches=1, discard_no_relationships=True):
-    members = get_members()
-    relationships = []
+# def fetch_data(num_batches=1, discard_no_relationships=True):
+#     members_data = get_members()
+#     relationships = []
 
-    # Fetch the specified number of batches
-    batch_iter = 0
-    for batch in get_relationships(members, batch_size=10):
-        relationships.extend(batch)
-        time.sleep(1)  # Add a delay to avoid overloading the endpoint
-        batch_iter += 1
-        if batch_iter >= num_batches:
-            break
+#     # Fetch the specified number of batches
+#     batch_iter = 0
+#     members = [uri for uri, _ in members_data]
+#     for batch in get_relationships(members, batch_size=10):
+#         relationships.extend(batch)
+#         time.sleep(1)  # Add a delay to avoid overloading the endpoint
+#         batch_iter += 1
+#         if batch_iter >= num_batches:
+#             break
 
-    if discard_no_relationships:
-        # Keep only members with relationships
-        members_with_relationships = set()
-        for relationship in relationships:
-            members_with_relationships.add(relationship["person"]["value"])
-        members = list(members_with_relationships)
+#     if discard_no_relationships:
+#         # Keep only members with relationships
+#         members_with_relationships = set()
+#         for relationship in relationships:
+#             members_with_relationships.add(relationship["person"]["value"])
+#         members_data = [(uri, attrs) for uri, attrs in members_data if uri in members_with_relationships]
 
-    return members, relationships
+#     members = {uri: attrs for uri, attrs in members_data}
+
+#     return members, relationships
 
 
 if __name__ == "__main__":
-    members_discard, relationships_discard = fetch_data(num_batches=3, discard_no_relationships=True)
-    print(f"{len(members_discard)} MEMBERS (discard)")
-    print(members_discard)
-    print(f"{len(relationships_discard)} RELATIONSHIPS (discard):")
-    print(relationships_discard)
+    m = get_members()
+    r = get_relationships(m[:10])
+    print(m)
+    print(r)
+    pass
+    # m, r = fetch_data()
+    # print(m)
+    # members_discard, relationships_discard = fetch_data(num_batches=3, discard_no_relationships=True)
+    # print(f"{len(members_discard)} MEMBERS (discard)")
+    # print(members_discard)
+    # print(f"{len(relationships_discard)} RELATIONSHIPS (discard):")
+    # print(relationships_discard)
 
-    members, relationships = fetch_data(num_batches=3, discard_no_relationships=False)
-    print(f"{len(members)} MEMBERS")
-    print(members)
-    print(f"{len(relationships)} RELATIONSHIPS:")
-    print(relationships)
+    # members, relationships = fetch_data(num_batches=3, discard_no_relationships=False)
+    # print(f"{len(members)} MEMBERS")
+    # print(members)
+    # print(f"{len(relationships)} RELATIONSHIPS:")
+    # print(relationships)
     
-    with open("./test_members_discard.json", "w") as fp:
-        fp.write(json.dumps(members_discard))
-    with open("./test_relationships_discard.json", "w") as fp:
-        fp.write(json.dumps(relationships_discard))
+    # with open("./test_members_discard.json", "w") as fp:
+    #     fp.write(json.dumps(members_discard))
+    # with open("./test_relationships_discard.json", "w") as fp:
+    #     fp.write(json.dumps(relationships_discard))
 
-    with open("./test_members.json", "w") as fp:
-        fp.write(json.dumps(members))
-    with open("./test_relationships.json", "w") as fp:
-        fp.write(json.dumps(relationships))
+    # with open("./test_members.json", "w") as fp:
+    #     fp.write(json.dumps(members))
+    # with open("./test_relationships.json", "w") as fp:
+    #     fp.write(json.dumps(relationships))
     # Process and store the relationships data as required
 
