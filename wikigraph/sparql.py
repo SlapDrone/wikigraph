@@ -2,9 +2,9 @@ import json
 import sys
 import time
 import typing as ty
-import pydantic
 from SPARQLWrapper import SPARQLWrapper, JSON
 
+import wikigraph.models as M
 
 wikidata_endpoint = "https://query.wikidata.org/sparql"
 sparql = SPARQLWrapper(wikidata_endpoint)
@@ -66,35 +66,7 @@ WHERE {{
 }}
 """
 
-
-class Member(pydantic.BaseModel):
-    uri: str = pydantic.Field(alias="person")
-    label: str = pydantic.Field(alias="personLabel")
-
-
-class Relationship(pydantic.BaseModel):
-    person_uri: str = pydantic.Field(alias="person")
-    person_label: str = pydantic.Field(alias="personLabel")
-    related_person_uri: str = pydantic.Field(alias="related_person")
-    related_person_label: str = pydantic.Field(alias="related_personLabel")
-    relationship: str
-
-
-def map_to_models(
-    query_results: list[dict],
-    model: pydantic.BaseModel
-) -> list[pydantic.BaseModel]:
-    mapped_data = []
-
-    for result in query_results:
-        data = {key: value["value"] for key, value in result.items()}
-        instance = model(**data)
-        mapped_data.append(instance)
-
-    return mapped_data
-
-
-def get_members() -> list[Member]:
+def get_members() -> list[M.Member]:
     sparql.setQuery(members_query)
     results = sparql.query().convert()
     bindings = results["results"]["bindings"]
@@ -102,9 +74,9 @@ def get_members() -> list[Member]:
 
 
 def get_relationships(
-    members: list[Member],
+    members: list[M.Member],
     relationship_types=relationship_types
-) -> list[Relationship]:
+) -> list[M.Relationship]:
     member_values = " ".join(f"wd:{member.uri.split('/')[-1]}" for member in members)
     relationship_values = " ".join([f"wdt:{r}" for r in relationship_types])
     relationships_query = relationships_query_template.format(
@@ -119,10 +91,10 @@ def get_relationships(
 
 
 def fetch_relationships_in_batches(
-    members: list[Member],
+    members: list[M.Member],
     batch_size: int = 10,
     relationship_types=relationship_types
-) -> list[Relationship]:
+) -> list[M.Relationship]:
     all_relationships = []
 
     for i in range(0, len(members), batch_size):
