@@ -70,7 +70,7 @@ def get_members() -> list[M.Member]:
     sparql.setQuery(members_query)
     results = sparql.query().convert()
     bindings = results["results"]["bindings"]
-    return map_to_models(bindings, Member)
+    return M.map_to_models(bindings, M.Member)
 
 
 def get_relationships(
@@ -87,7 +87,7 @@ def get_relationships(
     results = sparql.query().convert()
     bindings = results["results"]["bindings"]
     print(bindings[:2])
-    return map_to_models(bindings, Relationship)
+    return M.map_to_models(bindings, M.Relationship)
 
 
 def fetch_relationships_in_batches(
