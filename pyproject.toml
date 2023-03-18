@@ -16,6 +16,9 @@ psycopg2 = "*"
 flower = "*"
 redis = {version = "*", extras = ["hiredis"]}
 pydantic = "^1.10.6"
+python-json-logger = "*"
+injector = "*"
+
 
 [tool.poetry.dev-dependencies]
 pytest = "*"

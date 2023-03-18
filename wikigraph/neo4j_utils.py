@@ -4,21 +4,20 @@ from typing import Dict, List
 from neo4j import GraphDatabase, Driver
 
 import wikigraph.models as M
+import wikigraph.config as C
 
 
-NEO4J_URI = os.environ.get("NEO4J_URI", "bolt://neo4j:7687")
-NEO4J_USER = os.environ.get("NEO4J_USER", "neo4j")
-NEO4J_PASSWORD = os.environ.get("NEO4J_PASSWORD", "testpassword")
+logger = logging.getLogger(__name__)
 
 
-def create_connection() -> Driver:
+def create_connection(settings: C.Settings) -> Driver:
     """
     Create a connection to the Neo4j database.
 
     Returns:
         Driver: A Neo4j database driver object.
     """
-    driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+    driver = GraphDatabase.driver(settings.neo4j_uri, auth=(settings.neo4j_user, settings.neo4j_password))
     return driver
 
 def insert_members(driver: Driver, members: List[Member]):

@@ -10,3 +10,5 @@
     - adapt docker setup: test database etc
 5. Rewrite DAG to be easily distributed. Maybe ask GPT about high level design of distributed system task processing.
 6. Pre-commit hooks for code quality stuff.
+
+Condition on testdriven stuff?

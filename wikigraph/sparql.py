@@ -1,4 +1,5 @@
 import json
+import logging
 import sys
 import time
 import typing as ty
@@ -6,136 +7,90 @@ from SPARQLWrapper import SPARQLWrapper, JSON
 
 import wikigraph.models as M
 
+
+logger = logging.getLogger(__name__)
+
 wikidata_endpoint = "https://query.wikidata.org/sparql"
 sparql = SPARQLWrapper(wikidata_endpoint)
 sparql.setReturnFormat(JSON)
 
+
 # Query to get the Nazi Party members
-members_query = """
-PREFIX wd: <http://www.wikidata.org/entity/>
-PREFIX wdt: <http://www.wikidata.org/prop/direct/>
-PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+def create_persons_query(offset: int, limit: int) -> str:
+    """
+    Builds a SPARQL query string to get the `offset`-th to the (`offset` + `limit`)-th person
+    """
+    query = f"""
+    PREFIX wd: <http://www.wikidata.org/entity/>
+    PREFIX wdt: <http://www.wikidata.org/prop/direct/>
+    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 
-SELECT ?person ?personLabel
-WHERE {
-  ?person wdt:P31/wdt:P279* wd:Q5 .  # Instance of human or subclass of human
-  ?person wdt:P102 wd:Q7320 .  # Member of: Nazi Party
-  ?person rdfs:label ?personLabel .
-  FILTER (LANG(?personLabel) = "en").
-}
-LIMIT 100
-"""
+    SELECT ?person ?personLabel
+    WHERE {{
+      ?person wdt:P31/wdt:P279* wd:Q5 .  # Instance of human or subclass of human
+      ?person wdt:P102 wd:Q7320 .  # Member of: Nazi Party
+      ?person rdfs:label ?personLabel .
+      FILTER (LANG(?personLabel) = "en").
+    }}
+    OFFSET {offset}
+    LIMIT {limit}
+    """
+    return query
 
-# Query to get the family relationships of Nazi Party members
-relationship_types = [
-    "P40",   # Child
-    "P22",   # Father
-    "P25",   # Mother
-    "P3373", # Sibling
-    "P1038", # Relative
-    "P1037", # Employer
-    "P106",  # Occupation
-    "P108",  # Employer
-    "P1347", # Participant of
-    "P551",  # Residence
-    "P1313", # Position held
-    "P1026", # Diplomatic relation
-    "P1441", # Present in work
-    "P1269", # Facet of
-    "P451"  # Romantic partner
-]
 
 # {{wdt:P40 wdt:P22 wdt:P25 wdt:P3373 wdt:P1038}}
-relationships_query_template = """
-PREFIX wd: <http://www.wikidata.org/entity/>
-PREFIX wdt: <http://www.wikidata.org/prop/direct/>
-PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+def build_relationships_query(
+    offset: int,
+    limit: int,
+    members: str,
+    relationship_types: str
+) -> str:
+    return f"""
+    PREFIX wd: <http://www.wikidata.org/entity/>
+    PREFIX wdt: <http://www.wikidata.org/prop/direct/>
+    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 
-SELECT ?person ?personLabel ?related_person ?related_personLabel ?relationship
-WHERE {{
-  VALUES ?person {{{members}}}
-  ?person wdt:P31/wdt:P279* wd:Q5 .  # Instance of human or subclass of human
-  ?person rdfs:label ?personLabel .
-  FILTER (LANG(?personLabel) = "en").
-  
-  VALUES ?relationship {{{relationship_types}}}  # Family relationship properties
-  ?person ?relationship ?related_person . 
-  ?related_person wdt:P31/wdt:P279* wd:Q5 .  # Instance of human or subclass of human
-  ?related_person rdfs:label ?related_personLabel .
-  FILTER (LANG(?related_personLabel) = "en").
-}}
-"""
+    SELECT ?person ?personLabel ?related_person ?related_personLabel ?relationship
+    WHERE {{
+      VALUES ?person {{{members}}}
+      ?person wdt:P31/wdt:P279* wd:Q5 .  # Instance of human or subclass of human
+      ?person rdfs:label ?personLabel .
+      FILTER (LANG(?personLabel) = "en").
 
-def get_members() -> list[M.Member]:
-    sparql.setQuery(members_query)
+      VALUES ?relationship {{{relationship_types}}}  # Family relationship properties
+      ?person ?relationship ?related_person . 
+      ?related_person wdt:P31/wdt:P279* wd:Q5 .  # Instance of human or subclass of human
+      ?related_person rdfs:label ?related_personLabel .
+      FILTER (LANG(?related_personLabel) = "en").
+    }}
+    OFFSET {offset}
+    LIMIT {limit}
+    """
+
+
+def execute_query(query: str) -> list[dict]:
+    sparql.setQuery(query)
     results = sparql.query().convert()
     bindings = results["results"]["bindings"]
-    return M.map_to_models(bindings, M.Member)
+    return bindings
 
 
-def get_relationships(
-    members: list[M.Member],
-    relationship_types=relationship_types
-) -> list[M.Relationship]:
+def get_persons(offset: int, limit: int) -> list[M.Person]:
+    query = create_persons_query(offset, limit)
+    bindings = execute_query(query)
+    return M.map_to_models(bindings, M.Person)
+
+
+def get_relationships(offset: int, limit: int, members: list[M.Person]) -> list[M.Relationship]:
     member_values = " ".join(f"wd:{member.uri.split('/')[-1]}" for member in members)
     relationship_values = " ".join([f"wdt:{r}" for r in relationship_types])
-    relationships_query = relationships_query_template.format(
-        members=member_values,
-        relationship_types=relationship_values
-    )
-    sparql.setQuery(relationships_query)
-    results = sparql.query().convert()
-    bindings = results["results"]["bindings"]
-    print(bindings[:2])
+    query = build_relationships_query(offset, limit, member_values, relationship_values)
+    bindings = execute_query(query)
     return M.map_to_models(bindings, M.Relationship)
 
 
-def fetch_relationships_in_batches(
-    members: list[M.Member],
-    batch_size: int = 10,
-    relationship_types=relationship_types
-) -> list[M.Relationship]:
-    all_relationships = []
-
-    for i in range(0, len(members), batch_size):
-        batch = members[i:i + batch_size]
-        batch_relationships = get_relationships(batch, relationship_types)
-        all_relationships.extend(batch_relationships)
-
-    return all_relationships
-
-
-# def fetch_data(num_batches=1, discard_no_relationships=True):
-#     members_data = get_members()
-#     relationships = []
-
-#     # Fetch the specified number of batches
-#     batch_iter = 0
-#     members = [uri for uri, _ in members_data]
-#     for batch in get_relationships(members, batch_size=10):
-#         relationships.extend(batch)
-#         time.sleep(1)  # Add a delay to avoid overloading the endpoint
-#         batch_iter += 1
-#         if batch_iter >= num_batches:
-#             break
-
-#     if discard_no_relationships:
-#         # Keep only members with relationships
-#         members_with_relationships = set()
-#         for relationship in relationships:
-#             members_with_relationships.add(relationship["person"]["value"])
-#         members_data = [(uri, attrs) for uri, attrs in members_data if uri in members_with_relationships]
-
-#     members = {uri: attrs for uri, attrs in members_data}
-
-#     return members, relationships
-
 
 if __name__ == "__main__":
-    m = get_members()
-    r = get_relationships(m[:10])
-    print(m)
-    print(r)
     pass
     # m, r = fetch_data()
     # print(m)

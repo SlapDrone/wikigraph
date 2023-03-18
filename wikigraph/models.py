@@ -1,7 +1,12 @@
+import logging
+
 import pydantic
 
 
-class Member(pydantic.BaseModel):
+logger = logging.getLogger(__name__)
+
+
+class Person(pydantic.BaseModel):
     uri: str = pydantic.Field(alias="person")
     label: str = pydantic.Field(alias="personLabel")
 
