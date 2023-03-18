@@ -13,9 +13,7 @@ log_fields = LogFields(
 
 setup_logging(log_fields=log_fields)
 
-
 injector = Injector()
 settings = injector.get(Settings)
-
 
 main()
