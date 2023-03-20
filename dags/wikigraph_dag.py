@@ -1,9 +1,12 @@
 from datetime import datetime, timedelta
 from airflow import DAG
-from airflow.operators.python_operator import PythonOperator
-from wikigraph.sparql import fetch_data
-from wikigraph.data_transformer import process_data
-from wikigraph.neo4j_utils import create_connection, insert_data
+from airflow.operators.python_operator import PythonOperator, BranchPythonOperator
+from wikigraph.logger import logger
+from wikigraph.sparql import get_persons, get_relationships
+from wikigraph.neo4j_utils import create_connection, insert_persons, insert_relationships
+from wikigraph.config import Settings
+
+settings = Settings()
 
 default_args = {
     "owner": "airflow",
@@ -23,29 +26,58 @@ dag = DAG(
     catchup=False,
 )
 
-def fetch_and_process_data(**kwargs):
-    data = fetch_data()
-    members, relationships = data
-    processed_data = process_data(members, relationships)
-    kwargs["ti"].xcom_push(key="processed_data", value=processed_data)
+def fetch_and_store_persons(worker_id: int, offset: int, limit: int, **kwargs):
+    persons = get_persons(offset, limit)
+    if not persons:
+        return f"stop_processing_persons_{worker_id}"
+    driver = create_connection(settings)
+    insert_persons(driver, persons)
+    kwargs["ti"].xcom_push(key=f"persons_{worker_id}_{offset}_{limit}", value=persons)
+    logger.info(f"Worker {worker_id}: Fetched and stored {len(persons)} persons")
+    return f"fetch_and_store_relationships_{worker_id}"
 
-def store_data_in_neo4j(**kwargs):
-    processed_data = kwargs["ti"].xcom_pull(key="processed_data")
-    driver = create_connection()
-    insert_data(driver, processed_data)
+def fetch_and_store_relationships(worker_id: int, offset: int, limit: int, **kwargs):
+    persons = kwargs["ti"].xcom_pull(key=f"persons_{worker_id}_{offset}_{limit}")
+    relationships = get_relationships(offset, limit, persons, settings.relationship_types)
+    
+    if not relationships:
+        return f"stop_processing_relationships_{worker_id}"
 
-fetch_and_process_data_task = PythonOperator(
-    task_id="fetch_and_process_data",
-    python_callable=fetch_and_process_data,
-    provide_context=True,
-    dag=dag,
-)
+    driver = create_connection(settings)
+    insert_relationships(driver, relationships)
+    logger.info(f"Worker {worker_id}: Fetched and stored {len(relationships)} relationships")
+    return f"fetch_and_store_persons_{worker_id}"
 
-store_data_in_neo4j_task = PythonOperator(
-    task_id="store_data_in_neo4j",
-    python_callable=store_data_in_neo4j,
-    provide_context=True,
-    dag=dag,
-)
+for i in range(settings.num_workers):
+    offset = i * settings.items_per_worker
 
-fetch_and_process_data_task >> store_data_in_neo4j_task
+    branch_fetch_and_store_persons = BranchPythonOperator(
+        task_id=f"branch_fetch_and_store_persons_{i}",
+        python_callable=fetch_and_store_persons,
+        op_args=[i, offset, settings.items_per_worker],
+        provide_context=True,
+        dag=dag,
+    )
+
+    branch_fetch_and_store_relationships = BranchPythonOperator(
+        task_id=f"branch_fetch_and_store_relationships_{i}",
+        python_callable=fetch_and_store_relationships,
+        op_args=[i, offset, settings.items_per_worker],
+        provide_context=True,
+        dag=dag,
+    )
+
+    stop_processing_persons = PythonOperator(
+        task_id=f"stop_processing_persons_{i}",
+        python_callable=lambda: None,
+        dag=dag,
+    )
+
+    stop_processing_relationships = PythonOperator(
+        task_id=f"stop_processing_relationships_{i}",
+        python_callable=lambda: None,
+        dag=dag,
+    )
+
+    branch_fetch_and_store_persons >> [branch_fetch_and_store_relationships, stop_processing_persons]
+    branch_fetch_and_store_relationships >> [branch_fetch_and_store_persons, stop_processing_relationships]

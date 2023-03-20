@@ -82,7 +82,3 @@ def create_relation(tx, person_uri: str, related_person_uri: str, relation_type:
     """
     logger.debug(query)
     return tx.run(query, person_uri=person_uri, related_person_uri=related_person_uri, relation_type=relation_type)
-
-
-if __name__ == "__main__":
-    pass

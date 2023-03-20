@@ -29,5 +29,5 @@ def map_to_models(
         data = {key: value["value"] for key, value in result.items()}
         instance = model(**data)
         mapped_data.append(instance)
-
+    logger.debug(f"Mapped {len(mapped_data)} results to {model}")
     return mapped_data

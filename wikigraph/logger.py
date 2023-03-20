@@ -4,12 +4,11 @@ in the application entrypoint
 import logging
 import pydantic
 import typing as ty
+from injector import Injector
 
 from pythonjsonlogger.jsonlogger import JsonFormatter
 
-from wikigraph import wikigraph_settings
-
-LOG_LEVEL = logging.getLevelName(wikigraph_settings.log_level)
+from wikigraph import Settings
 
 
 class LogFields(pydantic.BaseModel):
@@ -87,6 +86,7 @@ def get_log_handlers(log_fields) -> List[Handler]:
 
 def setup_logging(
     log_fields: LogFields,
+    log_level: str
 ):
     """
     Configures logging with a chosen formatter.
@@ -95,7 +95,7 @@ def setup_logging(
 
     # Pass handlers and level back to the root logger
     root.handlers = handlers
-    root.setLevel(LOG_LEVEL)
+    root.setLevel(log_level)
 
     # pylint: disable=no-member
     for name in root.manager.loggerDict.keys():
@@ -116,3 +116,20 @@ def setup_logging(
         logger.handlers = []
         logger.setLevel(level)
         logger.propagate = True
+
+
+
+# TODO: fix this.
+# LOG_LEVEL = logging.getLevelName(settings.log_level)
+# log_fields = LogFields(
+#     correlation_id=classifier_settings.correlation_id,
+#     job_id=classifier_settings.job_id,
+# )
+
+# setup_logging(log_fields=log_fields)
+
+# injector = Injector()
+# settings = injector.get(Settings)
+
+# def get_logger(name: str):
+#     return logging.getLogger(name)

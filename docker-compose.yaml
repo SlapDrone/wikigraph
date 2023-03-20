@@ -25,6 +25,8 @@ x-app-common: &app-common
     - AIRFLOW__CORE__FERNET_KEY=${FERNET_KEY}
     - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
     - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW_SECRET_KEY}
+    - NUM_WORKERS=4
+    - ITEMS_PER_WORKER=50
   depends_on:
     - neo4j
     - redis

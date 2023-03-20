@@ -42,8 +42,8 @@ def create_persons_query(offset: int, limit: int) -> str:
 def build_relationships_query(
     offset: int,
     limit: int,
-    members: str,
-    relationship_types: str
+    persons_clause: str,
+    relationships_clause: str
 ) -> str:
     return f"""
     PREFIX wd: <http://www.wikidata.org/entity/>
@@ -52,12 +52,12 @@ def build_relationships_query(
 
     SELECT ?person ?personLabel ?related_person ?related_personLabel ?relationship
     WHERE {{
-      VALUES ?person {{{members}}}
+      VALUES ?person {{{persons}}}
       ?person wdt:P31/wdt:P279* wd:Q5 .  # Instance of human or subclass of human
       ?person rdfs:label ?personLabel .
       FILTER (LANG(?personLabel) = "en").
 
-      VALUES ?relationship {{{relationship_types}}}  # Family relationship properties
+      VALUES ?relationship {{{relationships}}}  # Family relationship properties
       ?person ?relationship ?related_person . 
       ?related_person wdt:P31/wdt:P279* wd:Q5 .  # Instance of human or subclass of human
       ?related_person rdfs:label ?related_personLabel .
@@ -81,10 +81,15 @@ def get_persons(offset: int, limit: int) -> list[M.Person]:
     return M.map_to_models(bindings, M.Person)
 
 
-def get_relationships(offset: int, limit: int, members: list[M.Person]) -> list[M.Relationship]:
-    member_values = " ".join(f"wd:{member.uri.split('/')[-1]}" for member in members)
-    relationship_values = " ".join([f"wdt:{r}" for r in relationship_types])
-    query = build_relationships_query(offset, limit, member_values, relationship_values)
+def get_relationships(
+    offset: int,
+    limit: int,
+    persons: list[M.Person],
+    relationships: list[str]
+) -> list[M.Relationship]:
+    persons_clause = " ".join(f"wd:{member.uri.split('/')[-1]}" for member in members)
+    relationships_clause = " ".join([f"wdt:{r}" for r in relationship_types])
+    query = build_relationships_query(offset, limit, persons_clause, relationships_clause)
     bindings = execute_query(query)
     return M.map_to_models(bindings, M.Relationship)
 

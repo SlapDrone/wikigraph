@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     # configure parameters stable over application lifetime and associated with jobs/runs
     job_id: str
     correlation_id: Optional[str] = pydantic.Field(default=None)
+    # worker settings
+    num_workers: int
+    items_per_worker: int
     # Database details
     neo4j_uri: pydantic.AnyUrl
     neo4j_user: str
