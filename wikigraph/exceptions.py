@@ -8,13 +8,13 @@
 """
 from abc import ABCMeta, abstractmethod
 from enum import Enum, auto
-from logging import getLogger
+import logging 
 from typing import Optional
 
-from wikigraph.log_helper import LoggingExtra
+from wikigraph.logger import LoggingExtra, get_logger
 
 
-logger = getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class Severity(Enum):
@@ -93,7 +93,7 @@ class UncaughtException(BaseResult):
     is_error = True
     is_full_failure = None
     is_transient = False
-    log_code = "ANNOTATE-CLASSIFY-U000"
+    log_code = "WIKIGRAPH-U000"
     level = Severity.exception
 
 
@@ -103,96 +103,26 @@ class NoFilesFoundException(BaseResult):
     is_error = True
     is_full_failure = True
     is_transient = False
-    log_code = "ANNOTATE-CLASSIFY-F000"
+    log_code = "WIKIGRAPH-F000"
     level = Severity.exception
 
 
-class DataDirectoryNotFoundException(BaseResult):
-    """Specified data path doesn't exist."""
-
-    is_error = True
-    is_full_failure = True
-    is_transient = False
-    log_code = "ANNOTATE-CLASSIFY-F001"
-    level = Severity.exception
+# wikigraph/exceptions.py
+class WikigraphError(Exception):
+    """Base exception class for the wikigraph package."""
 
 
-class ExtractionFailedException(BaseResult):
-    """No files found after extraction."""
-
-    is_error = True
-    is_full_failure = True
-    is_transient = False
-    log_code = "ANNOTATE-CLASSIFY-F002"
-    level = Severity.exception
+class DataFetchError(WikigraphError):
+    """Raised when there's an error while fetching data from Wikipedia or Wikidata."""
 
 
-class UploadToS3Exception(BaseResult):
-    """Failed to upload files to S3."""
-
-    is_error = True
-    is_full_failure = True
-    is_transient = True
-    log_code = "ANNOTATE-CLASSIFY-F003"
-    level = Severity.exception
+class DataProcessingError(WikigraphError):
+    """Raised when there's an issue processing the fetched data."""
 
 
-class InvalidWellFileException(BaseResult):
-    """Invalid well file provided."""
-
-    is_error = True
-    is_full_failure = False
-    is_transient = False
-    log_code = "ANNOTATE-CLASSIFY-E000"
-    level = Severity.exception
+class DatabaseConnectionError(WikigraphError):
+    """Raised when there's an error connecting to the Neo4j database."""
 
 
-# Exceptions just for classification
-class NoDatasetsProducedException(BaseResult):
-    """Failed to produce any datasets after stacking."""
-
-    is_error = True
-    is_full_failure = True
-    is_transient = False
-    log_code = "CLASSIFY-F000"
-    level = Severity.exception
-
-
-class EmptyDatasetException(BaseResult):
-    """All images have been removed."""
-
-    is_error = True
-    is_full_failure = False
-    is_transient = False
-    log_code = "CLASSIFY-E000"
-    level = Severity.exception
-
-
-class MissingMetadataException(BaseResult):
-    """Incomplete embryo metadata."""
-
-    is_error = True
-    is_full_failure = False
-    is_transient = False
-    log_code = "CLASSIFY-E001"
-    level = Severity.exception
-
-
-class ImageLoadingException(BaseResult):
-    """Error in loading image."""
-
-    is_error = True
-    is_full_failure = False
-    is_transient = False
-    log_code = "CLASSIFY-E002"
-    level = Severity.exception
-
-
-class AmbiguousMetadataException(BaseResult):
-    """Ambiguous embryo metadata."""
-
-    is_error = True
-    is_full_failure = False
-    is_transient = False
-    log_code = "CLASSIFY-E003"
-    level = Severity.exception
+class DatabaseInsertionError(WikigraphError):
+    """Raised when there's an error inserting data into the Neo4j database."""

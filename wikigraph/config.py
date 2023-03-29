@@ -1,14 +1,20 @@
+"""
+config.py
+"""
+import logging
 from functools import lru_cache
 from json import dumps
-from logging import getLogger
 from os import getenv
 from pathlib import Path
 from typing import Optional, Tuple
 from uuid import uuid4
 
+import pydantic
 from pydantic import BaseSettings, Json, validator
 
-logger = getLogger(__name__)
+
+# initial logger is default before config loaded
+logger = logging.getLogger(__name__)
 
 package_dir = Path(__file__).resolve().parent
 repo_dir = package_dir.parent
@@ -34,10 +40,10 @@ RELATIONSHIP_TYPES = [
 
 class Settings(BaseSettings):
     # Configure allowed relationship types for graph construction (Wikidata relations of format "P:XXX")
-    relationship_types: Json = pydantic.Field(default=RELATIONSHIP_TYPES)
+    relationship_types: list = pydantic.Field(default=RELATIONSHIP_TYPES)
     # configure parameters stable over application lifetime and associated with jobs/runs
-    job_id: str
-    correlation_id: Optional[str] = pydantic.Field(default=None)
+    job_id: str = pydantic.Field(default="local_job")
+    correlation_id: str = pydantic.Field(default="local_corr")
     # worker settings
     num_workers: int
     items_per_worker: int
@@ -50,7 +56,7 @@ class Settings(BaseSettings):
     gcp_secret_access_key: str = pydantic.Field(default="")
     # debug/testing
     log_level: Optional[str] = pydantic.Field(default="INFO")
-    testing: bool = pydantic.Field(default=False)
+    testing: Optional[bool] = pydantic.Field(default=False)
 
     # TODO: More config validation in the pydantic base classes
     @validator("gcp_access_key_id")
@@ -69,7 +75,14 @@ class Settings(BaseSettings):
 
 
 @lru_cache()
-def get_settings(**kwargs) -> Settings:
-    """Retrieve application settings"""
-    logger.info("Loading config settings from the environment...")
-    return Settings(**kwargs)
+def get_settings() -> Settings:
+    try:
+        settings = Settings()
+        logger = get_logger(__name__, settings=settings)
+        logger.info("Settings loaded successfully.")
+    except Exception as e:
+        logger = get_logger(__name__)
+        logger.error("Error loading settings: %s", e)
+        raise
+
+    return settings

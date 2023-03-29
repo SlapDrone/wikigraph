@@ -1,12 +1,12 @@
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python_operator import PythonOperator, BranchPythonOperator
-from wikigraph.logger import logger
+from wikigraph import settings
+from wikigraph.logger import get_logger
 from wikigraph.sparql import get_persons, get_relationships
 from wikigraph.neo4j_utils import create_connection, insert_persons, insert_relationships
-from wikigraph.config import Settings
+from wikigraph.config import Settings, get_settings
 
-settings = Settings()
 
 default_args = {
     "owner": "airflow",

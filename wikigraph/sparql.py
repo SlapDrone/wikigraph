@@ -6,9 +6,9 @@ import typing as ty
 from SPARQLWrapper import SPARQLWrapper, JSON
 
 import wikigraph.models as M
+from wikigraph.logger import get_logger
 
-
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 wikidata_endpoint = "https://query.wikidata.org/sparql"
 sparql = SPARQLWrapper(wikidata_endpoint)

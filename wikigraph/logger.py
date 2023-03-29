@@ -1,14 +1,19 @@
-"""Module to configure logging handlers, filters and levels
+"""
+logging.py
+
+Module to configure logging handlers, filters and levels
 in the application entrypoint
 """
 import logging
 import pydantic
 import typing as ty
+from pathlib import Path
 from injector import Injector
 
 from pythonjsonlogger.jsonlogger import JsonFormatter
 
-from wikigraph import Settings
+from wikigraph.config import Settings
+
 
 
 class LogFields(pydantic.BaseModel):
@@ -18,12 +23,12 @@ class LogFields(pydantic.BaseModel):
 
 class LoggingExtra(pydantic.BaseModel):
     """Config to pass to a logger's extra parameter"""
-    limit: Optional[int] = None
-    offset: Optional[int] = None
+    limit: ty.Optional[int] = None
+    offset: ty.Optional[int] = None
 
 
 
-class AppFilter(Filter):
+class AppFilter(logging.Filter):
     """
     Class that can act on a log handler to filter all records passed to the handle
     and add fields that should be present in all logs
@@ -50,7 +55,7 @@ class AppFilter(Filter):
         return True
 
 
-def get_log_handlers(log_fields) -> List[Handler]:
+def get_log_handlers(log_fields) -> list[logging.Handler]:
     """
     Define and format logging handlers to use in the app
     Logs are read into CloudWatch via stdout/stderr (StreamHandler).
@@ -85,21 +90,30 @@ def get_log_handlers(log_fields) -> List[Handler]:
 
 
 def setup_logging(
-    log_fields: LogFields,
-    log_level: str
-):
+    settings: ty.Optional[Settings] = None
+) -> None:
     """
     Configures logging with a chosen formatter.
     """
+    global root_logger
+    if settings is None:
+        log_fields = LogFields(correlation_id="", job_id="")
+        log_level = logging.getLevelName(logging.INFO)        
+    else:
+        log_fields = LogFields(
+            correlation_id=settings.correlation_id,
+            job_id=settings.job_id
+        )
+        log_level = logging.getLevelName(settings.log_level)
     handlers = get_log_handlers(log_fields=log_fields)
 
     # Pass handlers and level back to the root logger
-    root.handlers = handlers
-    root.setLevel(log_level)
+    logging.root.handlers = handlers
+    logging.root.setLevel(log_level)
 
     # pylint: disable=no-member
-    for name in root.manager.loggerDict.keys():
-        logger = getLogger(name)
+    for name in logging.root.manager.loggerDict.keys():
+        logger = logging.getLogger(name)
         logger.handlers = []
         logger.propagate = True
 
@@ -117,19 +131,9 @@ def setup_logging(
         logger.setLevel(level)
         logger.propagate = True
 
+# Set up default logging configuration
+root_logger = logging.getLogger()
+setup_logging()
 
-
-# TODO: fix this.
-# LOG_LEVEL = logging.getLevelName(settings.log_level)
-# log_fields = LogFields(
-#     correlation_id=classifier_settings.correlation_id,
-#     job_id=classifier_settings.job_id,
-# )
-
-# setup_logging(log_fields=log_fields)
-
-# injector = Injector()
-# settings = injector.get(Settings)
-
-# def get_logger(name: str):
-#     return logging.getLogger(name)
+def get_logger(name: str) -> logging.Logger:
+    return root_logger.getChild(name)

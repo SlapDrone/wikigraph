@@ -5,9 +5,9 @@ from neo4j import GraphDatabase, Driver
 
 import wikigraph.models as M
 import wikigraph.config as C
+from wikigraph.logger import get_logger
 
-
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def create_connection(settings: C.Settings) -> Driver:

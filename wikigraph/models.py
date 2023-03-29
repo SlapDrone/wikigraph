@@ -2,8 +2,9 @@ import logging
 
 import pydantic
 
+from wikigraph.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class Person(pydantic.BaseModel):
