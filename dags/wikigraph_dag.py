@@ -8,6 +8,8 @@ from wikigraph.neo4j_utils import create_connection, insert_persons, insert_rela
 from wikigraph.config import Settings, get_settings
 
 
+logger = get_logger("wikigraph_dag")
+
 default_args = {
     "owner": "airflow",
     "depends_on_past": False,
